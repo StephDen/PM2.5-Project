@@ -79,14 +79,6 @@ class UNet(nn.Module):
             nn.ReLU(inplace=True)
         )
 
-# Example usage
-in_channels = 3  # number of input channels
-out_channels = 1  # number of output channels 
-model = UNet(in_channels, out_channels)
-
-# Print the model architecture
-print(model)
-
 # Define dataset and DataLoader
 train_dataset =  TrainingDataset(train=True)
 test_dataset =  TrainingDataset(train=False)
@@ -95,7 +87,7 @@ train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
 # Initialize U-Net model, loss function, and optimizer
-in_channels = 3  # Number of input channels
+in_channels = 4  # Number of input channels
 out_channels = 1  # Number of output channels
 model = UNet(in_channels, out_channels)
 
