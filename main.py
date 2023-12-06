@@ -24,49 +24,60 @@ class  TrainingDataset (Dataset):
 
         return sample, target
 
-# Define U-Net model
 class UNet(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(UNet, self).__init__()
-
+        
         # Encoder
-        self.encoder = nn.Sequential(
-            nn.Conv2d(in_channels, 64, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(64, 64, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2)
-        )
-
-        # Mid part
-        self.mid = nn.Sequential(
-            nn.Conv2d(64, 128, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(128, 128, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2)
-        )
-
+        self.encoder1 = self.double_conv(in_channels, 64)
+        self.encoder2 = self.double_conv(64, 128)
+        self.encoder3 = self.double_conv(128, 256)
+        self.encoder4 = self.double_conv(256, 512)
+        
         # Decoder
-        self.decoder = nn.Sequential(
-            nn.Conv2d(128, 64, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(64, 64, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.ConvTranspose2d(64, out_channels, kernel_size=2, stride=2)
-        )
-
+        self.decoder1 = self.double_conv(512, 256)
+        self.decoder2 = self.double_conv(256, 128)
+        self.decoder3 = self.double_conv(128, 64)
+        
+        # Up-sampling
+        self.upconv1 = nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2)
+        self.upconv2 = nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2)
+        self.upconv3 = nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2)
+        
+        # Output layer
+        self.outconv = nn.Conv2d(64, out_channels, kernel_size=1)
+    
     def forward(self, x):
         # Encoder
-        x1 = self.encoder(x)
-
-        # Mid part
-        x2 = self.mid(x1)
-
-        # Decoder
-        x3 = self.decoder(x2)
-
-        return x3
+        enc1 = self.encoder1(x)
+        enc2 = self.encoder2(enc1)
+        enc3 = self.encoder3(enc2)
+        enc4 = self.encoder4(enc3)
+        
+        # Decoder with skip connections
+        dec1 = self.upconv1(enc4)
+        dec1 = torch.cat([dec1, enc3], dim=1)
+        dec1 = self.decoder1(dec1)
+        
+        dec2 = self.upconv2(dec1)
+        dec2 = torch.cat([dec2, enc2], dim=1)
+        dec2 = self.decoder2(dec2)
+        
+        dec3 = self.upconv3(dec2)
+        dec3 = torch.cat([dec3, enc1], dim=1)
+        dec3 = self.decoder3(dec3)
+        
+        # Output
+        output = self.outconv(dec3)
+        return output
+    
+    def double_conv(self, in_channels, out_channels):
+        return nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True)
+        )
 
 # Example usage
 in_channels = 3  # number of input channels
