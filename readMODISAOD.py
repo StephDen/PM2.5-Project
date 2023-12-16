@@ -21,9 +21,9 @@ import geopandas as gpd
 # import random
 
 # MAIAC files:
-    
+i
 #filepath = r"C:\Users\minad\Documents\UBC\EOSC-555B\FinalProject\MODISdata"
-FILE_NAME = r"C:\Users\minad\Documents\UBC\EOSC-555B\FinalProject\MODIS_WashOr_2021-07-18\MCD19A2.A2021199.h09v04.061.2023149031557.hdf"
+FILE_NAME = "MCD19A2.A2021199.h09v04.061.2023149031557.hdf"
 granule_id = 'MCD19A2.A2021199.h09v04.061.2023149031557'
 
 # Open file
@@ -260,5 +260,5 @@ def plot_gdf(gdf: gpd.GeoDataFrame, separate_bands: bool = True):
 plot_gdf(gdf, separate_bands=True)
 
 #Save dataframe with corrected AOD and corresponding lat/lons 
-gdf.to_csv(r"C:\Users\minad\Documents\UBC\EOSC-555B\FinalProject\MAIACAOD.csv")
+gdf.to_csv("MAIACAOD.csv")
 
