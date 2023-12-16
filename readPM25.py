@@ -35,4 +35,6 @@ df_new.drop(idx_cut,inplace=True)
 df_new.drop(df_new.columns[0],axis=1,inplace=True)
 df_new.reset_index(inplace=True)
 
+df_new.rename({"Daily Mean PM2.5 Concentration":"value","SITE_LATITUDE": "lat", "SITE_LONGITUDE": "lon"},axis=1,inplace=True)
+
 df_new.to_csv(r"C:\Users\minad\Documents\UBC\EOSC-555B\FinalProject\PM25.csv")

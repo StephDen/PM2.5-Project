@@ -55,6 +55,6 @@ P_grb = pd.DataFrame(np.ravel(P_grb[18:,18:]))
 precip_grb = pd.DataFrame(np.ravel(precip_grb[18:,18:]))
 
 df = pd.concat([lats,lons,u_grb,v_grb,Td_grb,T_grb,P_grb,precip_grb],axis=1)
-df.columns=['Lats','Lons','U_windspeed','V_windspeed','DewpointTemp','Temp','SurfPressure','Precip']
+df.columns=['lat','lon','U_windspeed','V_windspeed','DewpointTemp','Temp','SurfPressure','Precip']
 
 df.to_csv(r"C:\Users\minad\Documents\UBC\EOSC-555B\FinalProject\ERA5data.csv")
