@@ -60,33 +60,27 @@ class  TrainingDataset ():
 
         return result_tensor
     def getmodisaod(self, northing,easting):
-        modisaod = self.modisaod.copy()
-        return self.datatotensor(
-            modisaod,
-            easting + self.tensor_size / 2,
-            easting - self.tensor_size / 2,
-            northing + self.tensor_size / 2,
-            northing - self.tensor_size / 2
-        )
+        modisaod = self.modisaod
+        return self.datatotensor(modisaod,easting + self.tensor_size / 2,easting - self.tensor_size / 2,northing + self.tensor_size / 2,northing - self.tensor_size / 2)
 
     def getU_windspeed(self, northing,easting):
-        U_windspeed = self.U_windspeed.copy()
+        U_windspeed = self.U_windspeed
         return self.datatotensor(U_windspeed, easting+self.tensor_size/2, easting-self.tensor_size/2, northing+self.tensor_size/2, northing-self.tensor_size/2)
     
     def getV_windspeed(self, northing,easting):
-        V_windspeed = self.V_windspeed.copy()
+        V_windspeed = self.V_windspeed
         return self.datatotensor(V_windspeed, easting+self.tensor_size/2, easting-self.tensor_size/2, northing+self.tensor_size/2, northing-self.tensor_size/2)
     
     def getDewpointTemp(self, northing,easting):
-        DewpointTemp = self.DewpointTemp.copy()
+        DewpointTemp = self.DewpointTemp
         return self.datatotensor(DewpointTemp, easting+self.tensor_size/2, easting-self.tensor_size/2, northing+self.tensor_size/2, northing-self.tensor_size/2)
     
     def getTemp(self, northing,easting):
-        Temp = self.Temp.copy()
+        Temp = self.Temp
         return self.datatotensor(Temp, easting+self.tensor_size/2, easting-self.tensor_size/2, northing+self.tensor_size/2, northing-self.tensor_size/2)
 
     def getSurfPressure(self, northing,easting):
-        SurfPressure = self.SurfPressure.copy()
+        SurfPressure = self.SurfPressure
         return self.datatotensor(SurfPressure, easting+self.tensor_size/2, easting-self.tensor_size/2, northing+self.tensor_size/2, northing-self.tensor_size/2)
     
     def getPrecip(self, northing,easting):
@@ -102,8 +96,7 @@ class  TrainingDataset ():
         SurfPressure = self.getSurfPressure(northing,easting)
         Precip = self.getPrecip(northing,easting)
     
-        input_tensor = torch.cat([modisaod.unsqueeze(2),U_windspeed.unsqueeze(2),V_windspeed.unsqueeze(2),DewpointTemp.unsqueeze(2),Temp.unsqueeze(2),SurfPressure.unsqueeze(2),Precip.unsqueeze(2)], dim=2)
-
+        input_tensor = torch.stack((modisaod, U_windspeed, V_windspeed, DewpointTemp, Temp, SurfPressure, Precip), dim=0)
         return input_tensor
 
 class UNet(nn.Module):
@@ -160,16 +153,19 @@ class UNet(nn.Module):
             nn.ReLU(inplace=True)
         )
 
+# Define the CNN model
 class CNN(nn.Module):
-    def __init__(self, num_channels, tensor_size):
+    def __init__(self, in_channels):
         super(CNN, self).__init__()
-        self.conv1 = nn.Conv2d(num_channels, tensor_size, kernel_size=3, stride=1, padding=1)
+        
+        # Define the layers
+        self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=3, stride=1, padding=1)
         self.relu = nn.ReLU()
-        self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.conv2 = nn.Conv2d(tensor_size, tensor_size*2, kernel_size=3, stride=1, padding=1)
-        self.fc1 = nn.Linear(tensor_size*2 * 7 * 7, tensor_size)
-        self.fc2 = nn.Linear(tensor_size, 1)
-    
+        self.maxpool = nn.MaxPool2d(kernel_size=2)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
+        self.fc1 = nn.Linear(625, 128)
+        self.fc2 = nn.Linear(128, 1)
+
     def forward(self, x):
         x = self.conv1(x)
         x = self.relu(x)
@@ -188,7 +184,7 @@ in_channels = 7  # Number of input channels
 tensor_size = 100  # Size of the input tensor
 dataset = TrainingDataset(tensor_size)
 #%%
-model = CNN(in_channels, tensor_size)
+model = CNN(in_channels)
 
 criterion = nn.MSELoss()
 
