@@ -5,15 +5,15 @@ from torch.utils.data import DataLoader
 from torch.optim import Adam
 from torch.utils.data import Dataset
 import pandas as pd
-import os
 import utm
+import os
+
 # Set script directory to working directory
 os.chdir(os.path.dirname(os.path.realpath(__file__)))
-
 #%%
-class  TrainingDataset (Dataset):
-    def __init__(self, tensor_size,train=True):
-        ## Function to apply the conversion to each row
+class  TrainingDataset ():
+    def __init__(self, tensor_size):
+        # Function to apply the conversion to each row
         def lat_lon_to_utm(row):
             utm_coords = utm.from_latlon(row["lat"],row["lon"])
             return utm_coords[0], utm_coords[1]
@@ -23,24 +23,34 @@ class  TrainingDataset (Dataset):
             df["utm_easting"] = df["utm_easting"].round(-3)
             df["utm_northing"] = df["utm_northing"].round(-3)
             return df
+
         self.tensor_size = tensor_size
+
+        #pm25
         self.pm25 = lat_long_to_utm_df(pd.read_csv("PM25.csv")[["value","lat","lon"]])
+        #modisaod
         self.modisaod = lat_long_to_utm_df(pd.read_csv("MAIACAOD.csv")[["lat","lon","value"]])
-        #self.era5 = pd.read_csv("ERA5.csv")
-        self.train = train
+        #era5
+        era5 = pd.read_csv("ERA5data.csv")
+        self.U_windspeed = lat_long_to_utm_df(era5[["lat","lon","U_windspeed"]])
+        self.V_windspeed = lat_long_to_utm_df(era5[["lat","lon","V_windspeed"]])
+        self.DewpointTemp = lat_long_to_utm_df(era5[["lat","lon","DewpointTemp"]])
+        self.Temp = lat_long_to_utm_df(era5[["lat","lon","Temp"]])
+        self.SurfPressure = lat_long_to_utm_df(era5[["lat","lon","SurfPressure"]])
+        self.Precip = lat_long_to_utm_df(era5[["lat","lon","Precip"]])
 
     # Convert UTM data to a tensor
-    def datatotensor(df,easting_max,easting_min,northing_max,northing_min):
+    def datatotensor(self,df,easting_max,easting_min,northing_max,northing_min):
         # Filter the dataframe to the specified easting and northing ranges
         filtered_data = df[
             (df['utm_easting'] >= easting_min) & (df['utm_easting'] <= easting_max) &
             (df['utm_northing'] >= northing_min) & (df['utm_northing'] <= northing_max)
         ]
 
-        kilometer_spacing = (3000 - 0) / 3000  # Assuming a regular grid
+        kilometer_spacing = 1  # Assuming a regular grid
         result_tensor = torch.zeros((tensor_size,tensor_size),dtype=torch.float32)
         # Populate the tensor with values from sparse data
-        for index, row in df.iterrows():
+        for index, row in filtered_data.iterrows():
             easting_index = int((row['utm_easting'] - easting_min)/kilometer_spacing)
             northing_index = int((row['utm_northing'] - northing_min)/kilometer_spacing)
             
@@ -50,39 +60,73 @@ class  TrainingDataset (Dataset):
 
         return result_tensor
     def getmodisaod(self, northing,easting):
-        return datatotensor(self.modisaod, easting+self.tensor_size/2, easting-self.tensor_size/2, northing+self.tensor_size/2, northing-self.tensor_size/2)
-    def getPM2_5(self, northing,easting):
-        return datatotensor(self.pm25, easting+self.tensor_size/2, easting-self.tensor_size/2, northing+self.tensor_size/2, northing-self.tensor_size/2)
+        modisaod = self.modisaod.copy()
+        return self.datatotensor(
+            modisaod,
+            easting + self.tensor_size / 2,
+            easting - self.tensor_size / 2,
+            northing + self.tensor_size / 2,
+            northing - self.tensor_size / 2
+        )
+
+    def getU_windspeed(self, northing,easting):
+        U_windspeed = self.U_windspeed.copy()
+        return self.datatotensor(U_windspeed, easting+self.tensor_size/2, easting-self.tensor_size/2, northing+self.tensor_size/2, northing-self.tensor_size/2)
+    
+    def getV_windspeed(self, northing,easting):
+        V_windspeed = self.V_windspeed.copy()
+        return self.datatotensor(V_windspeed, easting+self.tensor_size/2, easting-self.tensor_size/2, northing+self.tensor_size/2, northing-self.tensor_size/2)
+    
+    def getDewpointTemp(self, northing,easting):
+        DewpointTemp = self.DewpointTemp.copy()
+        return self.datatotensor(DewpointTemp, easting+self.tensor_size/2, easting-self.tensor_size/2, northing+self.tensor_size/2, northing-self.tensor_size/2)
+    
+    def getTemp(self, northing,easting):
+        Temp = self.Temp.copy()
+        return self.datatotensor(Temp, easting+self.tensor_size/2, easting-self.tensor_size/2, northing+self.tensor_size/2, northing-self.tensor_size/2)
+
+    def getSurfPressure(self, northing,easting):
+        SurfPressure = self.SurfPressure.copy()
+        return self.datatotensor(SurfPressure, easting+self.tensor_size/2, easting-self.tensor_size/2, northing+self.tensor_size/2, northing-self.tensor_size/2)
+    
+    def getPrecip(self, northing,easting):
+        Precip = self.Precip.copy()
+        return  self.datatotensor(Precip, easting+self.tensor_size/2, easting-self.tensor_size/2, northing+self.tensor_size/2, northing-self.tensor_size/2)
 
     def getdata(self, northing,easting):
         modisaod = self.getmodisaod(northing,easting)
-        PM2_5 = self.getPM2_5(northing,easting)
-        input_tensor = torch.cat([modisaod.unsqueeze(2)], dim=2)
-        target_tensor = torch.cat([pm2_5.unsqueeze(0)], dim=0)
-        return input_tensor, target_tensor
+        U_windspeed = self.getU_windspeed(northing,easting)
+        V_windspeed = self.getV_windspeed(northing,easting)
+        DewpointTemp = self.getDewpointTemp(northing,easting)
+        Temp = self.getTemp(northing,easting)
+        SurfPressure = self.getSurfPressure(northing,easting)
+        Precip = self.getPrecip(northing,easting)
+    
+        input_tensor = torch.cat([modisaod.unsqueeze(2),U_windspeed.unsqueeze(2),V_windspeed.unsqueeze(2),DewpointTemp.unsqueeze(2),Temp.unsqueeze(2),SurfPressure.unsqueeze(2),Precip.unsqueeze(2)], dim=2)
+
+        return input_tensor
 
 class UNet(nn.Module):
     def __init__(self, in_channels, out_channels,tensor_size):
         super(UNet, self).__init__()
-        self.dim = tensor_size
         # Encoder
-        self.encoder1 = self.double_conv(in_channels, dim)
-        self.encoder2 = self.double_conv(dim, dim*2)
-        self.encoder3 = self.double_conv(dim*2, dim*4)
-        self.encoder4 = self.double_conv(dim*4, dim*8)
+        self.encoder1 = self.double_conv(in_channels, tensor_size)
+        self.encoder2 = self.double_conv(tensor_size, tensor_size*2)
+        self.encoder3 = self.double_conv(tensor_size*2, tensor_size*4)
+        self.encoder4 = self.double_conv(tensor_size*4, tensor_size*8)
         
         # Decoder
-        self.decoder1 = self.double_conv(dim*8, dim*4)
-        self.decoder2 = self.double_conv(dim*4, dim*2)
-        self.decoder3 = self.double_conv(dim*2, dim)
+        self.decoder1 = self.double_conv(tensor_size*8, tensor_size*4)
+        self.decoder2 = self.double_conv(tensor_size*4, tensor_size*2)
+        self.decoder3 = self.double_conv(tensor_size*2, tensor_size)
         
         # Up-sampling
-        self.upconv1 = nn.ConvTranspose2d(dim*8, dim*4, kernel_size=2, stride=2)
-        self.upconv2 = nn.ConvTranspose2d(dim*4, dim*2, kernel_size=2, stride=2)
-        self.upconv3 = nn.ConvTranspose2d(dim*2, dim, kernel_size=2, stride=2)
+        self.upconv1 = nn.ConvTranspose2d(tensor_size*8, tensor_size*4, kernel_size=2, stride=2)
+        self.upconv2 = nn.ConvTranspose2d(tensor_size*4, tensor_size*2, kernel_size=2, stride=2)
+        self.upconv3 = nn.ConvTranspose2d(tensor_size*2, tensor_size, kernel_size=2, stride=2)
         
         # Output layer
-        self.outconv = nn.Conv2d(dim, out_channels, kernel_size=1)
+        self.outconv = nn.Conv2d(tensor_size, out_channels, kernel_size=1)
     
     def forward(self, x):
         # Encoder
@@ -116,12 +160,35 @@ class UNet(nn.Module):
             nn.ReLU(inplace=True)
         )
 
+class CNN(nn.Module):
+    def __init__(self, num_channels, tensor_size):
+        super(CNN, self).__init__()
+        self.conv1 = nn.Conv2d(num_channels, tensor_size, kernel_size=3, stride=1, padding=1)
+        self.relu = nn.ReLU()
+        self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.conv2 = nn.Conv2d(tensor_size, tensor_size*2, kernel_size=3, stride=1, padding=1)
+        self.fc1 = nn.Linear(tensor_size*2 * 7 * 7, tensor_size)
+        self.fc2 = nn.Linear(tensor_size, 1)
+    
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+        x = self.conv2(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc1(x)
+        x = self.relu(x)
+        x = self.fc2(x)
+        return x
+
 # Initialize U-Net model, loss function, and optimizer
-in_channels = 4  # Number of input channels
-out_channels = 1  # Number of output channels
-tensor_size = 3000  # Size of the input tensor
+in_channels = 7  # Number of input channels
+tensor_size = 100  # Size of the input tensor
 dataset = TrainingDataset(tensor_size)
-model = UNet(in_channels, out_channels)
+#%%
+model = CNN(in_channels, tensor_size)
 
 criterion = nn.MSELoss()
 
@@ -132,7 +199,8 @@ for epoch, row in enumerate(dataset.pm25.iterrows()):
 
     model.train()
 
-    inputs, targets = dataset.getdata(row['utm_northing'],row['utm_easting'])
+    inputs = dataset.getdata(row[1]['utm_northing'],row[1]['utm_easting'])
+    targets = row[1]['value']
 
     optimizer.zero_grad()
     outputs = model(inputs)
@@ -142,3 +210,5 @@ for epoch, row in enumerate(dataset.pm25.iterrows()):
 
     average_loss = total_loss / len(train_loader)
     print(f"Epoch {epoch+1}/{num_epochs}, Loss: {average_loss}")
+
+# %%

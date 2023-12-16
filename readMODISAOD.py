@@ -19,11 +19,14 @@ import geopandas as gpd
 #from cloudpathlib import S3Path
 # from pathlib import Path
 # import random
+import os
 
+# Set script directory to working directory
+os.chdir(os.path.dirname(os.path.realpath(__file__)))
 # MAIAC files:
     
 #filepath = r"C:\Users\minad\Documents\UBC\EOSC-555B\FinalProject\MODISdata"
-FILE_NAME = r"C:\Users\minad\Documents\UBC\EOSC-555B\FinalProject\MODIS_WashOr_2021-07-18\MCD19A2.A2021199.h09v04.061.2023149031557.hdf"
+FILE_NAME = "MCD19A2.A2021199.h09v04.061.2023149031557.hdf"
 granule_id = 'MCD19A2.A2021199.h09v04.061.2023149031557'
 
 # Open file
@@ -272,5 +275,5 @@ gdf.reset_index(inplace=True)
 
 
 # Save dataframe with corrected AOD and corresponding lat/lons 
-gdf.to_csv(r"C:\Users\minad\Documents\UBC\EOSC-555B\FinalProject\MAIACAOD.csv")
+gdf.to_csv("MAIACAOD.csv")
 
