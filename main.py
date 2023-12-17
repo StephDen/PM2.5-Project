@@ -14,7 +14,8 @@ os.chdir(os.path.dirname(os.path.realpath(__file__)))
 #%%
 class  TrainingDataset ():
     def __init__(self, tensor_size):
-        # Function to apply the conversion to each row
+        
+        """ # Function to apply the conversion to each row
         def lat_lon_to_utm(row):
             utm_coords = utm.from_latlon(row["lat"],row["lon"])
             return utm_coords[0], utm_coords[1]
@@ -24,9 +25,6 @@ class  TrainingDataset ():
             df["utm_easting"] = df["utm_easting"].round(-3)
             df["utm_northing"] = df["utm_northing"].round(-3)
             return df
-
-        self.tensor_size = tensor_size
-
         #pm25
         self.pm25 = lat_long_to_utm_df(pd.read_csv("PM25.csv")[["value","lat","lon"]])
         #modisaod
@@ -39,9 +37,17 @@ class  TrainingDataset ():
         self.Temp = lat_long_to_utm_df(era5[["lat","lon","Temp"]])
         self.SurfPressure = lat_long_to_utm_df(era5[["lat","lon","SurfPressure"]])
         self.Precip = lat_long_to_utm_df(era5[["lat","lon","Precip"]])
+        """
+        self.tensor_size = tensor_size
+        self.pm25 = pd.read_csv("PM25.csv")
+        self.modisaod = pd.read_csv("MAIACAOD.csv")
+        self.ERA5data = pd.read_csv("ERA5data.csv")
+        self.U_windspeed
+
+
 
     # Convert UTM data to a tensor
-    def datatotensor(self,df,easting_max,easting_min,northing_max,northing_min):
+"""     def datatotensor(self,df,easting_max,easting_min,northing_max,northing_min):
         # Filter the dataframe to the specified easting and northing ranges
         filtered_data = df[
             (df['utm_easting'] >= easting_min) & (df['utm_easting'] <= easting_max) &
@@ -59,43 +65,29 @@ class  TrainingDataset ():
             if 0 <= easting_index < self.tensor_size and 0 <= northing_index < self.tensor_size:
                 result_tensor[easting_index, northing_index] = row['value']
 
+        return result_tensor """
+    def datasearch(self, df, lat,lon):
+        lat_max = lat + self.tensor_size/2
+        lat_min = lat - self.tensor_size/2
+        lon_max = lon + self.tensor_size/2
+        lon_min = lon - self.tensor_size/2
+
+        filtered_data = df.iloc[lat_min:lat_max,lon_min:lon_max,]
+
+        result_tensor = torch.zeros((tensor_size,tensor_size),dtype=torch.float32)
+        for lat in range(lat_min, lat_max):
+            for lon in range(lon_min, lon_max):
+                result_tensor[lat, lon] = filtered_data[lat, lon]
         return result_tensor
-    def getmodisaod(self, northing,easting):
-        modisaod = self.modisaod
-        return self.datatotensor(modisaod,easting + self.tensor_size / 2,easting - self.tensor_size / 2,northing + self.tensor_size / 2,northing - self.tensor_size / 2)
 
-    def getU_windspeed(self, northing,easting):
-        U_windspeed = self.U_windspeed
-        return self.datatotensor(U_windspeed, easting+self.tensor_size/2, easting-self.tensor_size/2, northing+self.tensor_size/2, northing-self.tensor_size/2)
-    
-    def getV_windspeed(self, northing,easting):
-        V_windspeed = self.V_windspeed
-        return self.datatotensor(V_windspeed, easting+self.tensor_size/2, easting-self.tensor_size/2, northing+self.tensor_size/2, northing-self.tensor_size/2)
-    
-    def getDewpointTemp(self, northing,easting):
-        DewpointTemp = self.DewpointTemp
-        return self.datatotensor(DewpointTemp, easting+self.tensor_size/2, easting-self.tensor_size/2, northing+self.tensor_size/2, northing-self.tensor_size/2)
-    
-    def getTemp(self, northing,easting):
-        Temp = self.Temp
-        return self.datatotensor(Temp, easting+self.tensor_size/2, easting-self.tensor_size/2, northing+self.tensor_size/2, northing-self.tensor_size/2)
-
-    def getSurfPressure(self, northing,easting):
-        SurfPressure = self.SurfPressure
-        return self.datatotensor(SurfPressure, easting+self.tensor_size/2, easting-self.tensor_size/2, northing+self.tensor_size/2, northing-self.tensor_size/2)
-    
-    def getPrecip(self, northing,easting):
-        Precip = self.Precip.copy()
-        return  self.datatotensor(Precip, easting+self.tensor_size/2, easting-self.tensor_size/2, northing+self.tensor_size/2, northing-self.tensor_size/2)
-
-    def getdata(self, northing,easting):
-        modisaod = self.getmodisaod(northing,easting)
-        U_windspeed = self.getU_windspeed(northing,easting)
-        V_windspeed = self.getV_windspeed(northing,easting)
-        DewpointTemp = self.getDewpointTemp(northing,easting)
-        Temp = self.getTemp(northing,easting)
-        SurfPressure = self.getSurfPressure(northing,easting)
-        Precip = self.getPrecip(northing,easting)
+    def getdata(self, lat,lon):
+        modisaod = self.datasearch(self.modisaod, lat,lon)
+        U_windspeed = self.datasearch(self.U_windspeed, lat,lon)
+        V_windspeed = self.datasearch(self.V_windspeed, lat,lon)
+        DewpointTemp = self.datasearch(self.DewpointTemp, lat,lon)
+        Temp = self.datasearch(self.Temp, lat,lon)
+        SurfPressure = self.datasearch(self.SurfPressure, lat,lon)
+        Precip = self.datasearch(self.Precip, lat,lon)
     
         input_tensor = torch.stack((modisaod, U_windspeed, V_windspeed, DewpointTemp, Temp, SurfPressure, Precip), dim=0)
         return input_tensor
