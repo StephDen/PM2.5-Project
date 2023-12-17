@@ -19,14 +19,11 @@ import geopandas as gpd
 #from cloudpathlib import S3Path
 # from pathlib import Path
 # import random
-import os
 
-# Set script directory to working directory
-os.chdir(os.path.dirname(os.path.realpath(__file__)))
 # MAIAC files:
     
 #filepath = r"C:\Users\minad\Documents\UBC\EOSC-555B\FinalProject\MODISdata"
-FILE_NAME = "MCD19A2.A2021199.h09v04.061.2023149031557.hdf"
+FILE_NAME = r"C:\Users\minad\Documents\UBC\EOSC-555B\FinalProject\MODIS_WashOr_2021-07-18\MCD19A2.A2021199.h09v04.061.2023149031557.hdf"
 granule_id = 'MCD19A2.A2021199.h09v04.061.2023149031557'
 
 # Open file
@@ -259,21 +256,26 @@ def plot_gdf(gdf: gpd.GeoDataFrame, separate_bands: bool = True):
     f.colorbar(img)
     plt.suptitle("Blue Band AOD", fontsize=12)
     
-# Plot each orbit individually
-plot_gdf(gdf, separate_bands=True)
+# Plot each orbit together
+plot_gdf(gdf, separate_bands=False)
+
+#Combine all orbit data 
+x=gdf.geometry.x
+y=gdf.geometry.y
+c=gdf.value
+df = pd.DataFrame({'lon': x,'lat': y,'value':c})
 
 # Cut grid to lat: 42 to 47.2, lon: -122.2 to -117
-lat_min = 42.0
-lat_max = 47.2
-lon_min = -122.2
-lon_max = -117
+lat_min = 42.5
+lat_max = 46.8
+lon_min = -121.5
+lon_max = -117.2
 
-idx_cut = gdf.loc[(gdf.lat<lat_min) | (gdf.lat>lat_max) | (gdf.lon>lon_max) | (gdf.lon<lon_min)].index
+idx_cut = gdf.loc[(gdf.lat<=lat_min) | (gdf.lat>=lat_max) | (gdf.lon>=lon_max) | (gdf.lon<=lon_min)].index
 gdf.drop(idx_cut,inplace=True)
 gdf.drop(gdf.columns[0],axis=1,inplace=True)
 gdf.reset_index(inplace=True)
 
-
 # Save dataframe with corrected AOD and corresponding lat/lons 
-gdf.to_csv("MAIACAOD.csv")
+gdf.to_csv(r"C:\Users\minad\Documents\UBC\EOSC-555B\FinalProject\MAIACAOD_CUT.csv")
 
