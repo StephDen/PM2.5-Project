@@ -176,7 +176,7 @@ class UNet(nn.Module):
 class SimpleCNN(nn.Module):
     def __init__(self, in_channels):
         super(SimpleCNN, self).__init__()
-        
+        size = 32
         # Define the layers
         self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=3, stride=1, padding=1)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
@@ -203,7 +203,7 @@ class SimpleCNN(nn.Module):
         x = self.maxpool(x)
         x = x.view(-1, 64*2*2)
         x = self.fc(x)
-        x = F.sigmoid(x)
+        x = torch.sigmoid(x)
         x = x.squeeze(1)
         return x
 # Initialize CNN model, loss function, and optimizer
@@ -238,42 +238,6 @@ for epoch in range(num_epochs):
     print(f"Epoch {epoch+1}, Loss: {loss}, Target: {targets}, Output: {outputs}")
 
 plot_loss(losses)
-#%%
-# Initialize CNN model, loss function, and optimizer
-in_channels = 7  # Number of input channels
-num_epochs = 100
-
-
-model = SimpleCNN(in_channels)
-
-criterion = nn.MSELoss()
-
-optimizer = Adam(model.parameters(), lr=0.001, weight_decay=1e-3)  # Adjust the learning rate as needed
-
-losses = []
-for epoch in range(num_epochs):
-
-    random_index = random.randint(0, len(dataset.pm25) - 1)
-    row = dataset.pm25.iloc[random_index]
-
-    model.train()
-
-    inputs = dataset.getdata(int(row['row']),int(row['col']))
-
-    targets = row['value']
-
-    optimizer.zero_grad()
-    outputs = model(inputs)
-    loss = criterion(outputs, torch.tensor(targets).float())
-    loss.backward()
-    #torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
-    optimizer.step()
-
-    losses.append(loss.item())
-    
-    print(f"Epoch {epoch+1}, Loss: {loss}, Target: {targets}, Output: {outputs}")
-
-plot_loss(losses)
 # %%
 ### Plot PM2.5 predictions 
 
@@ -290,7 +254,5 @@ PMoutputs = np.array(outputs).reshape(47,47)
 f, ax = plt.subplots(1, 1, figsize=(4, 4))
 img = ax.contourf(PMoutputs, cmap="RdYlBu_r")
 f.colorbar(img)
-
-
 
 # %%
