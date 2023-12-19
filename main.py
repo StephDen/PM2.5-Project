@@ -44,13 +44,22 @@ class  TrainingDataset ():
 
         self.tensor_size = tensor_size
         self.pm25, self.pm25_scaler = custom_min_max_scaling(pd.read_csv("PM25_final.csv"))
-        self.modisaod, self.modisaod_scaler = custom_min_max_scaling(pd.read_csv("MAIACAOD.csv"))
+        self.modisaod, self.modisaod_scaler = custom_min_max_scaling(pd.read_csv("AODregrid.csv")) #size: 47,48
         self.U_windspeed, self.U_windspeed_scaler = custom_min_max_scaling(pd.read_csv("U_windspeed.csv"))
         self.V_windspeed, self.V_windspeed_scaler = custom_min_max_scaling(pd.read_csv("V_windspeed.csv"))
         self.DewpointTemp, self.DewpointTemp_scaler = custom_min_max_scaling(pd.read_csv("DewpointTemp.csv"))
         self.Temp, self.Temp_scaler = custom_min_max_scaling(pd.read_csv("Temp.csv"))
         self.SurfPressure, self.SurfPressure_scaler = custom_min_max_scaling(pd.read_csv("SurfPressure.csv"))
         self.Precip, self.Precip_scaler = custom_min_max_scaling(pd.read_csv("Precip.csv"))
+        
+        # self.pm25 = pd.read_csv("PM25_final.csv")
+        # self.modisaod = pd.read_csv("AODregrid.csv")
+        # self.U_windspeed = pd.read_csv("U_windspeed.csv")
+        # self.V_windspeed = pd.read_csv("V_windspeed.csv")
+        # self.DewpointTemp = pd.read_csv("DewpointTemp.csv")
+        # self.Temp = pd.read_csv("Temp.csv")
+        # self.SurfPressure = pd.read_csv("SurfPressure.csv")
+        # self.Precip = pd.read_csv("Precip.csv")
     
     def datasearch(self, df, lat, lon):
         lat_max = int(lat + self.tensor_size/2)
@@ -58,7 +67,7 @@ class  TrainingDataset ():
         lon_max = int(lon + self.tensor_size/2)
         lon_min = int(lon - self.tensor_size/2)
 
-        filtered_data = df.iloc[lat_min:lat_max, lon_min:lon_max]
+        filtered_data = df.iloc[lat_min:lat_max, lon_min:lon_max] #breaks at this line
 
         result_tensor = torch.zeros((self.tensor_size, self.tensor_size), dtype=torch.float32)
         
@@ -177,7 +186,7 @@ class CNN(nn.Module):
         return x
 
 #%%
-# Initialize U-Net model, loss function, and optimizer
+# Initialize CNN model, loss function, and optimizer
 in_channels = 7  # Number of input channels
 num_epochs = 100
 model = CNN(in_channels)
@@ -208,3 +217,5 @@ for epoch in range(num_epochs):
     print(f"Epoch {epoch+1}, Loss: {loss}, Target: {targets}, Output: {outputs}")
 
 # %%
+### Plot PM2.5 predictions 
+
