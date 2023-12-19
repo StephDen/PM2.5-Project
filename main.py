@@ -262,6 +262,7 @@ class SimpleCNN(nn.Module):
         x = self.maxpool(x)
         x = x.view(-1, 64*2*2)
         x = self.fc(x)
+        x = F.sigmoid(x)
         x = x.squeeze(1)
         return x
 # Initialize CNN model, loss function, and optimizer
@@ -271,7 +272,7 @@ model = SimpleCNN(in_channels)
 
 criterion = nn.MSELoss()
 
-optimizer = Adam(model.parameters(), lr=0.0001, weight_decay=1e-5)  # Adjust the learning rate as needed
+optimizer = Adam(model.parameters(), lr=0.001, weight_decay=1e-3)  # Adjust the learning rate as needed
 
 losses = []
 for epoch in range(num_epochs):
@@ -288,7 +289,7 @@ for epoch in range(num_epochs):
     outputs = model(inputs)
     loss = criterion(outputs, torch.tensor(targets).float())
     loss.backward()
-    torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
+    #torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
     optimizer.step()
 
     losses.append(loss.item())
