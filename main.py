@@ -10,6 +10,21 @@ import utm
 import os
 import random
 from sklearn.preprocessing import MinMaxScaler
+import matplotlib.pyplot as plt
+
+def plot_loss(loss_values):
+    """
+    Function to plot loss per epoch.
+
+    Parameters:
+    - loss_values (list): List of loss values for each epoch.
+    """
+    plt.plot(loss_values, label='Training Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Training Loss per Epoch')
+    plt.legend()
+    plt.show()
 
 # Set script directory to working directory
 os.chdir(os.path.dirname(os.path.realpath(__file__)))
@@ -215,7 +230,72 @@ for epoch in range(num_epochs):
 
     
     print(f"Epoch {epoch+1}, Loss: {loss}, Target: {targets}, Output: {outputs}")
+#%%
+# Define the CNN model
+class SimpleCNN(nn.Module):
+    def __init__(self, in_channels):
+        super(SimpleCNN, self).__init__()
+        
+        # Define the layers
+        self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
+        self.relu = nn.LeakyReLU(negative_slope=0.01)
+        self.maxpool = nn.MaxPool2d(kernel_size=2)
+        self.fc = nn.Sequential(
+            nn.Linear(64*2*2, 128),
+            nn.LeakyReLU(negative_slope=0.01),
+            nn.Linear(128, 1)
+        )
+        self.init_weights()
 
+    def init_weights(self):
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                init.xavier_uniform_(module.weight)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+        x = self.conv2(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+        x = x.view(-1, 64*2*2)
+        x = self.fc(x)
+        x = x.squeeze(1)
+        return x
+# Initialize CNN model, loss function, and optimizer
+in_channels = 7  # Number of input channels
+num_epochs = 100
+model = SimpleCNN(in_channels)
+
+criterion = nn.MSELoss()
+
+optimizer = Adam(model.parameters(), lr=0.0001, weight_decay=1e-5)  # Adjust the learning rate as needed
+
+losses = []
+for epoch in range(num_epochs):
+
+    random_index = random.randint(0, len(dataset.pm25) - 1)
+    row = dataset.pm25.iloc[random_index]
+
+    model.train()
+
+    inputs = dataset.getdata(int(row['row']),int(row['col']))
+    targets = row['value']
+
+    optimizer.zero_grad()
+    outputs = model(inputs)
+    loss = criterion(outputs, torch.tensor(targets).float())
+    loss.backward()
+    torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
+    optimizer.step()
+
+    losses.append(loss.item())
+    
+    print(f"Epoch {epoch+1}, Loss: {loss}, Target: {targets}, Output: {outputs}")
+
+plot_loss(losses)
 # %%
 ### Plot PM2.5 predictions 
 
