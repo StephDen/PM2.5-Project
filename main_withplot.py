@@ -45,7 +45,7 @@ class  TrainingDataset ():
             return dataframe, scaler
 
         self.tensor_size = tensor_size
-        self.pm25, self.pm25_scaler = custom_min_max_scaling(pd.read_csv("PM25_final.csv"))
+        self.pm25, self.pm25_scaler = custom_min_max_scaling(pd.read_csv("PM25_final.csv"), columns=['value'])
         self.modisaod, self.modisaod_scaler = custom_min_max_scaling(pd.read_csv("AODregrid.csv")) #size: 47,48
         self.U_windspeed, self.U_windspeed_scaler = custom_min_max_scaling(pd.read_csv("U_windspeed.csv"))
         self.V_windspeed, self.V_windspeed_scaler = custom_min_max_scaling(pd.read_csv("V_windspeed.csv"))
@@ -217,7 +217,7 @@ for i in range(0,47):
     for j in range(0,47):
         inputs = dataset.getdata(i, j)
         tempout = model(inputs).detach().numpy()
-        tempout = dataset.pm25_scaler.inverse_transform(tempout.reshape(-1,1))
+        tempout = dataset.pm25_scaler.inverse_transform(tempout.reshape(1, -1))
         outputs.append(tempout)
         
 PMoutputs = np.array(outputs).reshape(47,47)        
@@ -227,3 +227,5 @@ img = ax.contourf(PMoutputs, cmap="RdYlBu_r")
 f.colorbar(img)
 
 
+
+# %%

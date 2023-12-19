@@ -5,12 +5,15 @@ from torch.utils.data import DataLoader
 from torch.optim import Adam
 from torch.utils.data import Dataset
 import torch.nn.init as init
+import torch.nn.functional as F
+from torchvision.transforms import functional as TF
 import pandas as pd
 import utm
 import os
 import random
 from sklearn.preprocessing import MinMaxScaler
 import matplotlib.pyplot as plt
+import numpy as np
 
 def plot_loss(loss_values):
     """
@@ -58,7 +61,7 @@ class  TrainingDataset ():
             return dataframe, scaler
 
         self.tensor_size = tensor_size
-        self.pm25, self.pm25_scaler = custom_min_max_scaling(pd.read_csv("PM25_final.csv"))
+        self.pm25, self.pm25_scaler = custom_min_max_scaling(pd.read_csv("PM25_final.csv"), columns=['value'])
         self.modisaod, self.modisaod_scaler = custom_min_max_scaling(pd.read_csv("AODregrid.csv")) #size: 47,48
         self.U_windspeed, self.U_windspeed_scaler = custom_min_max_scaling(pd.read_csv("U_windspeed.csv"))
         self.V_windspeed, self.V_windspeed_scaler = custom_min_max_scaling(pd.read_csv("V_windspeed.csv"))
@@ -235,6 +238,59 @@ for epoch in range(num_epochs):
     print(f"Epoch {epoch+1}, Loss: {loss}, Target: {targets}, Output: {outputs}")
 
 plot_loss(losses)
+#%%
+# Initialize CNN model, loss function, and optimizer
+in_channels = 7  # Number of input channels
+num_epochs = 100
+
+
+model = SimpleCNN(in_channels)
+
+criterion = nn.MSELoss()
+
+optimizer = Adam(model.parameters(), lr=0.001, weight_decay=1e-3)  # Adjust the learning rate as needed
+
+losses = []
+for epoch in range(num_epochs):
+
+    random_index = random.randint(0, len(dataset.pm25) - 1)
+    row = dataset.pm25.iloc[random_index]
+
+    model.train()
+
+    inputs = dataset.getdata(int(row['row']),int(row['col']))
+
+    targets = row['value']
+
+    optimizer.zero_grad()
+    outputs = model(inputs)
+    loss = criterion(outputs, torch.tensor(targets).float())
+    loss.backward()
+    #torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
+    optimizer.step()
+
+    losses.append(loss.item())
+    
+    print(f"Epoch {epoch+1}, Loss: {loss}, Target: {targets}, Output: {outputs}")
+
+plot_loss(losses)
 # %%
 ### Plot PM2.5 predictions 
 
+outputs = []
+for i in range(0,47):
+    for j in range(0,47):
+        inputs = dataset.getdata(i, j)
+        tempout = model(inputs).detach().numpy()
+        tempout = dataset.pm25_scaler.inverse_transform(tempout.reshape(1, -1))
+        outputs.append(tempout)
+        
+PMoutputs = np.array(outputs).reshape(47,47)        
+
+f, ax = plt.subplots(1, 1, figsize=(4, 4))
+img = ax.contourf(PMoutputs, cmap="RdYlBu_r")
+f.colorbar(img)
+
+
+
+# %%
