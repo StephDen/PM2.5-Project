@@ -8,7 +8,6 @@ import torch.nn.init as init
 import torch.nn.functional as F
 from torchvision.transforms import functional as TF
 import pandas as pd
-import utm
 import os
 import random
 from sklearn.preprocessing import MinMaxScaler
@@ -34,7 +33,7 @@ os.chdir(os.path.dirname(os.path.realpath(__file__)))
 #%%
 class  TrainingDataset ():
     def __init__(self, tensor_size):
-        def custom_min_max_scaling(dataframe, columns=None):
+        def custom_min_max_scaling(dataframes, columns):
             """
             Normalize specified columns of a DataFrame using Min-Max scaling.
 
@@ -46,38 +45,48 @@ class  TrainingDataset ():
             - pd.DataFrame: The DataFrame with normalized values.
             - MinMaxScaler: The fitted scaler object.
             """
-            if columns is None:
-                # If columns are not specified, normalize all numeric columns
-                numeric_columns = dataframe.select_dtypes(include=['float64']).columns
-            else:
-                numeric_columns = columns
 
             # Initialize the scaler
             scaler = MinMaxScaler()
 
-            # Fit the scaler on the specified columns and transform the data
-            dataframe[numeric_columns] = scaler.fit_transform(dataframe[numeric_columns])
+            # Apply min-max scaling to each DataFrame in the list
+            scaled_dataframes = [pd.DataFrame(scaler.fit_transform(df, columns), columns=df.columns) for df in dataframes]
 
-            return dataframe, scaler
-
-        self.tensor_size = tensor_size
-        self.pm25, self.pm25_scaler = custom_min_max_scaling(pd.read_csv("PM25_final.csv"), columns=['value'])
-        self.modisaod, self.modisaod_scaler = custom_min_max_scaling(pd.read_csv("AODregrid.csv")) #size: 47,48
-        self.U_windspeed, self.U_windspeed_scaler = custom_min_max_scaling(pd.read_csv("U_windspeed.csv"))
-        self.V_windspeed, self.V_windspeed_scaler = custom_min_max_scaling(pd.read_csv("V_windspeed.csv"))
-        self.DewpointTemp, self.DewpointTemp_scaler = custom_min_max_scaling(pd.read_csv("DewpointTemp.csv"))
-        self.Temp, self.Temp_scaler = custom_min_max_scaling(pd.read_csv("Temp.csv"))
-        self.SurfPressure, self.SurfPressure_scaler = custom_min_max_scaling(pd.read_csv("SurfPressure.csv"))
-        self.Precip, self.Precip_scaler = custom_min_max_scaling(pd.read_csv("Precip.csv"))
+            return scaled_dataframes, scaler
+        def read_csvs(file_name, directory_path = "data"):
+            """
+            Read all csv files in a directory and return a list of dataframes.
+            """
+            # Get a list of all files in the directory
+            files_folders = os.listdir(directory_path)
+            # get only folders
+            folders = [entry for entry in files_folders if os.path.isdir(os.path.join(directory_path, entry))]
+            dataframes = []
+            for folder in folders:
+                file_path = os.path.join(folder, file_name)
+                df = pd.read_csv(file_path)
+                dataframes.append(df)
+            return dataframes
         
-        # self.pm25 = pd.read_csv("PM25_final.csv")
-        # self.modisaod = pd.read_csv("AODregrid.csv")
-        # self.U_windspeed = pd.read_csv("U_windspeed.csv")
-        # self.V_windspeed = pd.read_csv("V_windspeed.csv")
-        # self.DewpointTemp = pd.read_csv("DewpointTemp.csv")
-        # self.Temp = pd.read_csv("Temp.csv")
-        # self.SurfPressure = pd.read_csv("SurfPressure.csv")
-        # self.Precip = pd.read_csv("Precip.csv")
+        root_folder = "data"
+        self.tensor_size = tensor_size
+        self.pm25, self.pm25_scaler = custom_min_max_scaling(read_csvs(root_folder, "PM25.csv"), columns=['value'])
+        self.modisaod, self.modisaod_scaler = custom_min_max_scaling(read_csvs(root_folder, "AODregrid.csv")) #size: 47,48
+        self.U_windspeed, self.U_windspeed_scaler = custom_min_max_scaling(read_csvs(root_folder, "U_windspeed.csv"))
+        self.V_windspeed, self.V_windspeed_scaler = custom_min_max_scaling(read_csvs(root_folder, "V_windspeed.csv"))
+        self.DewpointTemp, self.DewpointTemp_scaler = custom_min_max_scaling(read_csvs(root_folder, "DewpointTemp.csv"))
+        self.Temp, self.Temp_scaler = custom_min_max_scaling(read_csvs(root_folder, "Temp.csv"))
+        self.SurfPressure, self.SurfPressure_scaler = custom_min_max_scaling(read_csvs(root_folder, "SurfPressure.csv"))
+        self.Precip, self.Precip_scaler = custom_min_max_scaling(read_csvs(root_folder, "Precip.csv"))
+        # self.pm25, self.pm25_scaler = custom_min_max_scaling(pd.read_csv("PM25_final.csv"), columns=['value'])
+        # self.modisaod, self.modisaod_scaler = custom_min_max_scaling(pd.read_csv("AODregrid.csv")) #size: 47,48
+        # self.U_windspeed, self.U_windspeed_scaler = custom_min_max_scaling(pd.read_csv("U_windspeed.csv"))
+        # self.V_windspeed, self.V_windspeed_scaler = custom_min_max_scaling(pd.read_csv("V_windspeed.csv"))
+        # self.DewpointTemp, self.DewpointTemp_scaler = custom_min_max_scaling(pd.read_csv("DewpointTemp.csv"))
+        # self.Temp, self.Temp_scaler = custom_min_max_scaling(pd.read_csv("Temp.csv"))
+        # self.SurfPressure, self.SurfPressure_scaler = custom_min_max_scaling(pd.read_csv("SurfPressure.csv"))
+        # self.Precip, self.Precip_scaler = custom_min_max_scaling(pd.read_csv("Precip.csv"))
+        
     
     def datasearch(self, df, lat, lon):
         lat_max = int(lat + self.tensor_size/2)
@@ -101,14 +110,14 @@ class  TrainingDataset ():
         return result_tensor
 
 
-    def getdata(self, lat,lon):
-        modisaod = self.datasearch(self.modisaod, lat,lon)
-        U_windspeed = self.datasearch(self.U_windspeed, lat,lon)
-        V_windspeed = self.datasearch(self.V_windspeed, lat,lon)
-        DewpointTemp = self.datasearch(self.DewpointTemp, lat,lon)
-        Temp = self.datasearch(self.Temp, lat,lon)
-        SurfPressure = self.datasearch(self.SurfPressure, lat,lon)
-        Precip = self.datasearch(self.Precip, lat,lon)
+    def getdata(self,folder, lat,lon):
+        modisaod = self.datasearch(self.modisaod[folder], lat,lon)
+        U_windspeed = self.datasearch(self.U_windspeed[folder], lat,lon)
+        V_windspeed = self.datasearch(self.V_windspeed[folder], lat,lon)
+        DewpointTemp = self.datasearch(self.DewpointTemp[folder], lat,lon)
+        Temp = self.datasearch(self.Temp[folder], lat,lon)
+        SurfPressure = self.datasearch(self.SurfPressure[folder], lat,lon)
+        Precip = self.datasearch(self.Precip[folder], lat,lon)
     
         input_tensor = torch.stack((modisaod, U_windspeed, V_windspeed, DewpointTemp, Temp, SurfPressure, Precip), dim=0)
         return input_tensor
@@ -217,13 +226,13 @@ optimizer = Adam(model.parameters(), lr=0.001, weight_decay=1e-3)  # Adjust the 
 
 losses = []
 for epoch in range(num_epochs):
-
+    random_folder = random.randint(0, len(dataset.pm25) - 1)
     random_index = random.randint(0, len(dataset.pm25) - 1)
     row = dataset.pm25.iloc[random_index]
 
     model.train()
 
-    inputs = dataset.getdata(int(row['row']),int(row['col']))
+    inputs = dataset.getdata(random_folder,int(row['row']),int(row['col']))
     targets = row['value']
 
     optimizer.zero_grad()
