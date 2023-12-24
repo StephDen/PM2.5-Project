@@ -59,9 +59,22 @@ class  TrainingDataset ():
             scaler = MinMaxScaler()
             scaler.fit(combined_numeric_df)
 
+            
             # Apply min-max scaling to each DataFrame in the list
-            scaled_dataframes = [pd.DataFrame(scaler.transform(df[numeric_columns]), columns=numeric_columns) for df in dataframes]
-
+            #scaled_dataframes = [pd.DataFrame(scaler.transform(df[numeric_columns]), columns=numeric_columns) for df in dataframes]
+            scaled_dataframes = []
+            for df in dataframes:
+                # Extract non-numeric columns
+                non_numeric_columns = df.drop(columns=numeric_columns)
+                
+                # Scale numeric columns
+                scaled_numeric_columns = pd.DataFrame(scaler.fit_transform(df[numeric_columns]), columns=numeric_columns)
+                
+                # Concatenate scaled numeric columns with non-numeric columns
+                scaled_dataframe = pd.concat([non_numeric_columns, scaled_numeric_columns], axis=1)
+                
+                # Append the result to the list
+                scaled_dataframes.append(scaled_dataframe)
             return scaled_dataframes, scaler
         def read_csvs(file_name, directory_path = "data"):
             """
@@ -75,13 +88,14 @@ class  TrainingDataset ():
             for folder in folders:
                 file_path = os.path.join(directory_path, folder, file_name)
                 print(file_path)
-                df = pd.read_csv(file_path)
+                df = pd.read_csv(file_path, index_col=0)
+                df = df.replace(np.nan, 0)  # Replace NaN values with 0
                 dataframes.append(df)
             return dataframes
         
         root_folder = "data"
         self.tensor_size = tensor_size
-        self.pm25, self.pm25_scaler = custom_min_max_scaling(read_csvs("PM25.csv",root_folder), columns=['value','col','row'])
+        self.pm25, self.pm25_scaler = custom_min_max_scaling(read_csvs("PM25.csv",root_folder), columns=['value'])
         self.modisaod, self.modisaod_scaler = custom_min_max_scaling(read_csvs("AODregrid.csv",root_folder)) #size: 47,48
         self.U_windspeed, self.U_windspeed_scaler = custom_min_max_scaling(read_csvs("U_windspeed.csv",root_folder))
         self.V_windspeed, self.V_windspeed_scaler = custom_min_max_scaling(read_csvs("V_windspeed.csv",root_folder))
@@ -100,24 +114,15 @@ class  TrainingDataset ():
         
     
     def datasearch(self, df, lat, lon):
-        lat_max = int(lat + self.tensor_size/2)
         lat_min = int(lat - self.tensor_size/2)
-        lon_max = int(lon + self.tensor_size/2)
         lon_min = int(lon - self.tensor_size/2)
 
-        filtered_data = df.iloc[lat_min:lat_max, lon_min:lon_max] #breaks at this line
-
         result_tensor = torch.zeros((self.tensor_size, self.tensor_size), dtype=torch.float32)
-        
-        # Check if filtered_data has at least one row and one column
-        if len(filtered_data) > 0 and len(filtered_data.columns) > 0:
-            for i in range(lat_min, lat_max):
-                if (i > -1 and i < len(filtered_data)):
-                    for j in range(lon_min, lon_max):
-                        if (j > -1 and j < len(filtered_data.columns)):
-                            # Convert the value to a numeric type (float)
-                            result_tensor[i - lat_min, j - lon_min] = pd.to_numeric(filtered_data.iloc[i - lat_min, j - lon_min], errors='coerce')
-        
+        for i in range(0, tensor_size):
+            for j in range(0, tensor_size):
+                if (i+lat_min < df.shape[0] and j+lon_min < df.shape[1]) and (i+lat_min >= 0 and j+lon_min >= 0):
+                    result_tensor[i, j] = pd.to_numeric(df.iloc[i + lat_min, j + lon_min], errors='coerce')
+        #print(result_tensor)
         return result_tensor
 
 
@@ -200,11 +205,11 @@ class SimpleCNN(nn.Module):
         # Define the layers
         self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=3, stride=1, padding=1)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
-        self.relu = nn.LeakyReLU(negative_slope=0.01)
+        self.relu = nn.ReLU()
         self.maxpool = nn.MaxPool2d(kernel_size=2)
         self.fc = nn.Sequential(
             nn.Linear(64*2*2, 128),
-            nn.LeakyReLU(negative_slope=0.01),
+            nn.ReLU(),
             nn.Linear(128, 1)
         )
         self.init_weights()
@@ -334,11 +339,11 @@ def ResNet18_7Channels():
 # Initialize CNN model, loss function, and optimizer
 in_channels = 7  # Number of input channels
 num_epochs = 10000
-model = ResNet18_7Channels()
+model = SimpleCNN(in_channels)
 
 criterion = nn.MSELoss()
 
-optimizer = Adam(model.parameters(), lr=0.01, weight_decay=1e-3)  # Adjust the learning rate as needed
+optimizer = Adam(model.parameters(), lr=0.0001, weight_decay=1e-5)  # Adjust the learning rate as needed
 
 losses = []
 for epoch in range(num_epochs):
@@ -350,13 +355,14 @@ for epoch in range(num_epochs):
 
     inputs = dataset.getdata(random_folder,int(row['row']),int(row['col']))
     inputs = torch.unsqueeze(inputs, 0)
+    #print(inputs)
     targets = row['value']
 
     optimizer.zero_grad()
     outputs = model(inputs)
     loss = criterion(outputs, torch.tensor(targets).float())
     loss.backward()
-    #torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
+    torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
     optimizer.step()
 
     losses.append(loss.item())
@@ -368,17 +374,24 @@ plot_loss(losses)
 ### Plot PM2.5 predictions 
 
 outputs = []
-for i in range(0,47):
-    for j in range(0,47):
-        inputs = dataset.getdata(i, j)
+for i in range(0,46):
+    for j in range(0,46):
+        inputs = dataset.getdata(28,i, j)
         tempout = model(inputs).detach().numpy()
         tempout = dataset.pm25_scaler.inverse_transform(tempout.reshape(1, -1))
         outputs.append(tempout)
         
-PMoutputs = np.array(outputs).reshape(47,47)        
+PMoutputs = np.array(outputs).reshape(46,46)        
+#%%
 
+# Set specific minimum and maximum contour levels
+min_contour_level = 0
+max_contour_level = 100
+
+# Create a contour plot with specific levels
+levels = np.linspace(min_contour_level, max_contour_level, 101)  # 101 levels from 0 to 100
 f, ax = plt.subplots(1, 1, figsize=(4, 4))
-img = ax.contourf(PMoutputs, cmap="RdYlBu_r")
+img = ax.contourf(PMoutputs, levels=levels, cmap="RdYlBu_r")
 f.colorbar(img)
 
 # %%
